@@ -2,14 +2,18 @@ package rbac
 
 import (
 	"sync"
-
 )
 
 const maxCacheUsers = 1000
 
+type cacheKey struct {
+	ProjectID string
+	SubjectID string
+}
+
 type userCacheItem struct {
-	key string
-	val *User
+	key cacheKey
+	val *subjectGrants
 }
 
 type userCache struct {
@@ -23,24 +27,26 @@ func newUserCache() *userCache {
 	}
 }
 
-func (c *userCache) Get(id string) (*User, bool) {
+func (c *userCache) Get(projectID, subjectID string) (*subjectGrants, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+	key := cacheKey{projectID, subjectID}
 	for _, item := range c.items {
-		if item.key == id {
+		if item.key == key {
 			return item.val, true
 		}
 	}
 	return nil, false
 }
 
-func (c *userCache) Set(id string, u *User) {
+func (c *userCache) Set(projectID, subjectID string, g *subjectGrants) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	key := cacheKey{projectID, subjectID}
 
 	for i, item := range c.items {
-		if item.key == id {
-			c.items[i].val = u
+		if item.key == key {
+			c.items[i].val = g
 			return
 		}
 	}
@@ -49,21 +55,26 @@ func (c *userCache) Set(id string, u *User) {
 		// Evict oldest (FIFO)
 		c.items = c.items[1:]
 	}
-	c.items = append(c.items, userCacheItem{key: id, val: u})
+	c.items = append(c.items, userCacheItem{key: key, val: g})
 }
 
-func (c *userCache) Delete(id string) {
+func (c *userCache) Delete(projectID, subjectID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	key := cacheKey{projectID, subjectID}
 
 	for i, item := range c.items {
-		if item.key == id {
+		if item.key == key {
 			c.items = append(c.items[:i], c.items[i+1:]...)
 			return
 		}
 	}
 }
 
+// InvalidateByRole evicts every cached subject holding roleID, regardless
+// of project: role ids are meant to be project-scoped by convention, but
+// evicting an unrelated project's cache entry on a rare id collision costs
+// one extra cache miss, never a correctness bug.
 func (c *userCache) InvalidateByRole(roleID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

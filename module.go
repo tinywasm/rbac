@@ -6,7 +6,9 @@ import (
 	"github.com/tinywasm/user"
 )
 
-// Service owns role, permission, and subject-assignment persistence.
+// Service owns role, permission, and subject-assignment persistence,
+// scoped by project — every table carries project_id, so one Service over
+// one database serves every project (see ARCHITECTURE.md).
 type Service struct {
 	db     *orm.DB
 	ucache *userCache
@@ -20,13 +22,13 @@ func New(db *orm.DB) (*Service, error) {
 	return &Service{db: db, ucache: newUserCache()}, nil
 }
 
-// Can reports whether subjectID has a grant for resource/action.
-func (s *Service) Can(subjectID string, resource model.Resource, action model.Action) bool {
-	ok, err := s.HasPermission(subjectID, resource, action)
+// Can reports whether subjectID has a grant for resource/action within projectID.
+func (s *Service) Can(projectID, subjectID string, resource model.Resource, action model.Action) bool {
+	ok, err := s.HasPermission(projectID, subjectID, resource, action)
 	return err == nil && ok
 }
 
 // CanSubject is the typed alias for Can that accepts the stable user.SubjectID.
-func (s *Service) CanSubject(id user.SubjectID, resource model.Resource, action model.Action) bool {
-	return s.Can(string(id), resource, action)
+func (s *Service) CanSubject(projectID string, id user.SubjectID, resource model.Resource, action model.Action) bool {
+	return s.Can(projectID, string(id), resource, action)
 }

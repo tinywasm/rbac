@@ -19,6 +19,10 @@ flowchart TD
 
 ## Usage
 
+Every table — and every call — carries a `projectID`: one `Service` over one
+database serves every consuming project (`misitio`, `mjosefa-cms`, ...)
+without their roles/permissions colliding or leaking into each other.
+
 ```go
 import (
     "github.com/tinywasm/rbac"
@@ -31,15 +35,19 @@ conn, _ := sqlite.Open("app.db")
 db := orm.New(conn)
 svc, _ := rbac.New(db)
 
-_ = svc.CreateRole("role_admin", "admin", "Administrator", "")
-_ = svc.CreatePermission("service_catalog:crud", "catalog", "service_catalog", model.AllActions)
-_ = svc.AssignPermission("role_admin", "service_catalog:crud")
-_ = svc.AssignRole(string(subjectID), "role_admin")
+const projectID = "misitio"
 
-if svc.Can(string(subjectID), "service_catalog", model.Read) {
+_ = svc.CreateRole(projectID, "role_admin", "admin", "Administrator", "")
+_ = svc.CreatePermission(projectID, "service_catalog:crud", "catalog", "service_catalog", model.AllActions)
+_ = svc.AssignPermission(projectID, "role_admin", "service_catalog:crud")
+_ = svc.AssignRole(projectID, string(subjectID), "role_admin")
+
+if svc.Can(projectID, string(subjectID), "service_catalog", model.Read) {
     // granted
 }
 ```
 
-Empty or unknown subject IDs are denied; malformed stored actions surface
-`EventPermissionCorrupt` and deny.
+Empty or unknown subject IDs are denied — rbac never persists a "user" row,
+so a subject with no assignments simply resolves to zero permissions, not
+an error. Malformed stored actions deny and surface an error (never a
+silent `false, nil`).

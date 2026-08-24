@@ -7,12 +7,7 @@ import (
 )
 
 func initSchema(db *orm.DB) error {
-	models := []model.Model{
-		&User{}, &Role{}, &Permission{},
-		&Identity{}, &LANIP{},
-		&OAuthState{}, &UserRole{}, &RolePermission{},
-		&Session{},
-	}
+	models := []model.Model{&Role{}, &Permission{}, &UserRole{}, &RolePermission{}}
 	ddlCompiler, ok := db.RawConn().(ddl.Compiler)
 	if !ok {
 		return nil
