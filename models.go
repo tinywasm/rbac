@@ -17,6 +17,11 @@ var RoleModel = model.Definition{
 		{Name: "code", Type: model.Text()},
 		{Name: "name", Type: model.Text()},
 		{Name: "description", Type: model.Text()},
+		// session_ttl: seconds. 0 (default) means "use the caller's default TTL" —
+		// a role without it declared never extends another, more sensitive role's
+		// session (see veltylabs/iam's use of the MOST restrictive SessionTTL
+		// among a user's roles when issuing an authorization token).
+		{Name: "session_ttl", Type: model.Int()},
 	},
 }
 

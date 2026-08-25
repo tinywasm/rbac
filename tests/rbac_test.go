@@ -79,6 +79,51 @@ func TestFullFlow(t *testing.T) {
 	}
 }
 
+// TestGetRole is the consumer-shaped test ReadOneRole's calling convention
+// needed: passing db.Query(...) and ReadOneRole(qb, ...) two SEPARATE
+// &Role{} literals scans into the one baked into qb and returns the other,
+// still zero-valued, with err == nil — a silent "found nothing" that looks
+// like success. The fix is reusing the same *Role in both calls.
+func TestGetRole(t *testing.T) {
+	svc := newTestService(t)
+	if err := svc.CreateRole(testProject, "r_1", "editor", "Editor", "can edit"); err != nil {
+		t.Fatalf("CreateRole: %v", err)
+	}
+
+	r, err := svc.GetRole(testProject, "r_1")
+	if err != nil {
+		t.Fatalf("GetRole: %v", err)
+	}
+	if r.Id != "r_1" || r.ProjectId != testProject || r.Name != "Editor" {
+		t.Fatalf("GetRole returned a zero-valued role: %+v", r)
+	}
+}
+
+// TestSetRoleSessionTTL proves the field a caller needs to pick "the most
+// restrictive TTL among a user's roles" (see veltylabs/iam's IssueAuthToken)
+// actually round-trips through the role a subject is assigned.
+func TestSetRoleSessionTTL(t *testing.T) {
+	svc := newTestService(t)
+
+	if err := svc.CreateRole(testProject, "r_short", "short", "Short-lived", ""); err != nil {
+		t.Fatalf("CreateRole: %v", err)
+	}
+	if err := svc.SetRoleSessionTTL(testProject, "r_short", 300); err != nil {
+		t.Fatalf("SetRoleSessionTTL: %v", err)
+	}
+	if err := svc.AssignRole(testProject, "user-1", "r_short"); err != nil {
+		t.Fatalf("AssignRole: %v", err)
+	}
+
+	roles, err := svc.GetUserRoles(testProject, "user-1")
+	if err != nil {
+		t.Fatalf("GetUserRoles: %v", err)
+	}
+	if len(roles) != 1 || roles[0].SessionTtl != 300 {
+		t.Fatalf("expected one role with SessionTtl=300, got %+v", roles)
+	}
+}
+
 // TestProjectsAreIsolated is the property project_id exists for: the same
 // subject id can hold different roles in different projects without
 // either leaking into the other.

@@ -15,8 +15,9 @@ func (m *Service) CreateRole(projectID, id string, code model.RoleCode, name, de
 	}
 	err := m.db.Create(r)
 	if err != nil && isUniqueViolation(err) {
-		qb := m.db.Query(&Role{}).Where(Role_.ProjectId).Eq(projectID).Where(Role_.Id).Eq(id)
-		existingR, readErr := ReadOneRole(qb, &Role{})
+		existingR := &Role{}
+		qb := m.db.Query(existingR).Where(Role_.ProjectId).Eq(projectID).Where(Role_.Id).Eq(id)
+		existingR, readErr := ReadOneRole(qb, existingR)
 		if readErr != nil {
 			return readErr
 		}
@@ -28,9 +29,24 @@ func (m *Service) CreateRole(projectID, id string, code model.RoleCode, name, de
 	return err
 }
 
+// SetRoleSessionTTL sets the role's SessionTtl (seconds; 0 reverts to "use
+// the caller's default"). See RoleModel's session_ttl comment for the
+// most-restrictive-wins policy a caller applies across a user's roles.
+func (m *Service) SetRoleSessionTTL(projectID, id string, ttl int64) error {
+	r := &Role{}
+	qb := m.db.Query(r).Where(Role_.ProjectId).Eq(projectID).Where(Role_.Id).Eq(id)
+	r, err := ReadOneRole(qb, r)
+	if err != nil {
+		return err
+	}
+	r.SessionTtl = ttl
+	return m.db.Update(r, orm.Eq(Role_.ProjectId, r.ProjectId), orm.Eq(Role_.Id, r.Id))
+}
+
 func (m *Service) GetRole(projectID, id string) (*Role, error) {
-	qb := m.db.Query(&Role{}).Where(Role_.ProjectId).Eq(projectID).Where(Role_.Id).Eq(id)
-	return ReadOneRole(qb, &Role{})
+	r := &Role{}
+	qb := m.db.Query(r).Where(Role_.ProjectId).Eq(projectID).Where(Role_.Id).Eq(id)
+	return ReadOneRole(qb, r)
 }
 
 func (m *Service) DeleteRole(projectID, id string) error {
@@ -74,8 +90,9 @@ func (m *Service) CreatePermission(projectID, id, name string, resource model.Re
 	}
 	err := m.db.Create(p)
 	if err != nil && isUniqueViolation(err) {
-		qb := m.db.Query(&Permission{}).Where(Permission_.ProjectId).Eq(projectID).Where(Permission_.Id).Eq(id)
-		existingP, readErr := ReadOnePermission(qb, &Permission{})
+		existingP := &Permission{}
+		qb := m.db.Query(existingP).Where(Permission_.ProjectId).Eq(projectID).Where(Permission_.Id).Eq(id)
+		existingP, readErr := ReadOnePermission(qb, existingP)
 		if readErr != nil {
 			return readErr
 		}
@@ -88,13 +105,15 @@ func (m *Service) CreatePermission(projectID, id, name string, resource model.Re
 }
 
 func (m *Service) GetPermission(projectID, id string) (*Permission, error) {
-	qb := m.db.Query(&Permission{}).Where(Permission_.ProjectId).Eq(projectID).Where(Permission_.Id).Eq(id)
-	return ReadOnePermission(qb, &Permission{})
+	p := &Permission{}
+	qb := m.db.Query(p).Where(Permission_.ProjectId).Eq(projectID).Where(Permission_.Id).Eq(id)
+	return ReadOnePermission(qb, p)
 }
 
 func (m *Service) DeletePermission(projectID, id string) error {
-	qb := m.db.Query(&Permission{}).Where(Permission_.ProjectId).Eq(projectID).Where(Permission_.Id).Eq(id)
-	p, err := ReadOnePermission(qb, &Permission{})
+	p := &Permission{}
+	qb := m.db.Query(p).Where(Permission_.ProjectId).Eq(projectID).Where(Permission_.Id).Eq(id)
+	p, err := ReadOnePermission(qb, p)
 	if err != nil {
 		return err
 	}

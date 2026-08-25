@@ -13,13 +13,14 @@ type Role struct {
 	Code string
 	Name string
 	Description string
+	SessionTtl int64
 }
 
 func (m *Role) ModelName() string { return "role" }
 
 func (m *Role) Schema() []model.Field { return RoleModel.Fields }
 
-func (m *Role) Pointers() []any { return []any{&m.ProjectId, &m.Id, &m.Code, &m.Name, &m.Description} }
+func (m *Role) Pointers() []any { return []any{&m.ProjectId, &m.Id, &m.Code, &m.Name, &m.Description, &m.SessionTtl} }
 
 func (m *Role) IsNil() bool { return m == nil }
 
@@ -29,6 +30,7 @@ func (m *Role) EncodeFields(w model.FieldWriter) {
 	w.String("code", m.Code)
 	w.String("name", m.Name)
 	w.String("description", m.Description)
+	w.Int("session_ttl", m.SessionTtl)
 }
 
 func (m *Role) DecodeFields(r model.FieldReader) {
@@ -37,6 +39,7 @@ func (m *Role) DecodeFields(r model.FieldReader) {
 	if v, ok := r.String("code"); ok { m.Code = v }
 	if v, ok := r.String("name"); ok { m.Name = v }
 	if v, ok := r.String("description"); ok { m.Description = v }
+	if v, ok := r.Int("session_ttl"); ok { m.SessionTtl = v }
 }
 
 type RoleList []*Role
@@ -60,12 +63,14 @@ var Role_ = struct {
 	Code string
 	Name string
 	Description string
+	SessionTtl string
 }{
 	ProjectId: "project_id",
 	Id: "id",
 	Code: "code",
 	Name: "name",
 	Description: "description",
+	SessionTtl: "session_ttl",
 }
 
 func ReadOneRole(qb *orm.QB, model *Role) (*Role, error) {
