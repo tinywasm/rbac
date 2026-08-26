@@ -2,8 +2,9 @@
 PLAN: "feat!: Migrate is explicit — rbac.New stops running schema DDL"
 EXECUTOR: jules
 REVIEWER: none
-STATUS: running
+STATUS: review
 SESSION: 3878491805577921475
+PR: https://github.com/tinywasm/rbac/pull/1
 ---
 
 > This plan is dispatched via the CodeJob workflow. See skill: agents-workflow.
