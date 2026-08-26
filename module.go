@@ -8,7 +8,7 @@ import (
 
 // Service owns role, permission, and subject-assignment persistence,
 // scoped by project — every table carries project_id, so one Service over
-// one database serves every project (see ARCHITECTURE.md).
+// one database serves every consuming project (see ARCHITECTURE.md).
 type Service struct {
 	db     *orm.DB
 	ucache *userCache
@@ -16,9 +16,6 @@ type Service struct {
 
 // New creates an authorization service over the injected database.
 func New(db *orm.DB) (*Service, error) {
-	if err := initSchema(db); err != nil {
-		return nil, err
-	}
 	return &Service{db: db, ucache: newUserCache()}, nil
 }
 

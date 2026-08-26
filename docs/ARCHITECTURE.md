@@ -27,6 +27,11 @@ Rules:
   It never imports `auth` or a concrete provider.
 - Only the composition root imports both `auth` and `rbac`.
 
+## Setup & Database Migration
+
+Schema reconciliation (`rbac.Migrate`) is deploy-time work and is deliberately NOT called by `rbac.New`.
+Run `rbac.Migrate(conn, compiler)` once from a migration script or deploy task, then let `rbac.New(db)` assume the schema already exists.
+
 ## Concepts
 
 - **Roles** have a project ID, an ID, code, name, description.
