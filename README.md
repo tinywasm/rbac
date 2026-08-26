@@ -23,15 +23,20 @@ Every table — and every call — carries a `projectID`: one `Service` over one
 database serves every consuming project (`misitio`, `mjosefa-cms`, ...)
 without their roles/permissions colliding or leaking into each other.
 
+Schema reconciliation (`rbac.Migrate`) is performed once at deploy time, not inside `rbac.New`:
+
 ```go
 import (
     "github.com/tinywasm/rbac"
     "github.com/tinywasm/model"
     "github.com/tinywasm/orm"
     "github.com/tinywasm/sqlite"
+    "github.com/tinywasm/sqlt"
 )
 
 conn, _ := sqlite.Open("app.db")
+_ = rbac.Migrate(conn, sqlt.NewCompiler())
+
 db := orm.New(conn)
 svc, _ := rbac.New(db)
 

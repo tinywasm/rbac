@@ -3,6 +3,7 @@ package tests
 import (
 	"testing"
 
+	"github.com/tinywasm/ddl"
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 	"github.com/tinywasm/rbac"
@@ -21,6 +22,11 @@ func newTestService(t *testing.T) *rbac.Service {
 func newTestServiceWithDB(t *testing.T) (*orm.DB, *rbac.Service) {
 	t.Helper()
 	db := orm.New(mem.New())
+	if ddlCompiler, ok := db.RawConn().(ddl.Compiler); ok {
+		if err := rbac.Migrate(db.RawConn(), ddlCompiler); err != nil {
+			t.Fatalf("rbac.Migrate: %v", err)
+		}
+	}
 	svc, err := rbac.New(db)
 	if err != nil {
 		t.Fatalf("rbac.New: %v", err)
@@ -29,6 +35,38 @@ func newTestServiceWithDB(t *testing.T) (*orm.DB, *rbac.Service) {
 }
 
 const testProject = "proj-1"
+
+type mockExecer struct {
+	executed []string
+}
+
+func (m *mockExecer) Exec(query string, args ...any) error {
+	m.executed = append(m.executed, query)
+	return nil
+}
+
+type mockCompiler struct{}
+
+func (m *mockCompiler) CompileDDL(s ddl.Stmt, mModel model.Model) (string, []any, error) {
+	var name string
+	if mModel != nil {
+		name = mModel.ModelName()
+	}
+	return "CREATE TABLE mock (" + name + ");", nil, nil
+}
+
+func TestMigrateAcceptsExecer(t *testing.T) {
+	execer := &mockExecer{}
+	compiler := &mockCompiler{}
+
+	if err := rbac.Migrate(execer, compiler); err != nil {
+		t.Fatalf("Migrate failed with mockExecer: %v", err)
+	}
+
+	if len(execer.executed) == 0 {
+		t.Fatalf("expected DDL statements executed, got 0")
+	}
+}
 
 func TestClosedByDefault(t *testing.T) {
 	svc := newTestService(t)
