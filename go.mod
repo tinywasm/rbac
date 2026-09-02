@@ -10,4 +10,4 @@ require (
 	github.com/tinywasm/user v0.3.11
 )
 
-require github.com/tinywasm/storage v0.0.2-0.20260717121821-7e528006807f
+require github.com/tinywasm/storage v0.0.6
