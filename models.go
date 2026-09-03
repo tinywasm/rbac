@@ -14,7 +14,7 @@ var RoleModel = model.Definition{
 	Fields: model.Fields{
 		{Name: "project_id", Type: model.Text(), DB: &model.FieldDB{PK: true}, NotNull: true},
 		{Name: "id", Type: model.Text(), DB: &model.FieldDB{PK: true}},
-		{Name: "code", Type: model.Text()},
+		{Name: "code", Type: model.Text(), NotNull: true},
 		{Name: "name", Type: model.Text()},
 		{Name: "description", Type: model.Text()},
 		// session_ttl: seconds. 0 (default) means "use the caller's default TTL" —

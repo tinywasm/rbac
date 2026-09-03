@@ -235,3 +235,224 @@ func TestHasPermission_CorruptActionFailsLoudly(t *testing.T) {
 			"indistinguishable from \"this subject has no such permission\"")
 	}
 }
+
+func TestCreateRoleRejectsDuplicateCode(t *testing.T) {
+	svc := newTestService(t)
+	if err := svc.CreateRole(testProject, "id-1", "admin", "Admin 1", ""); err != nil {
+		t.Fatalf("CreateRole initial: %v", err)
+	}
+	err := svc.CreateRole(testProject, "id-2", "admin", "Admin 2", "")
+	if err != rbac.ErrDuplicateRoleCode {
+		t.Fatalf("expected ErrDuplicateRoleCode, got %v", err)
+	}
+}
+
+func TestSameCodeAllowedInDifferentProjects(t *testing.T) {
+	svc := newTestService(t)
+	if err := svc.CreateRole("proj-A", "id-a", "admin", "Admin A", ""); err != nil {
+		t.Fatalf("CreateRole proj-A: %v", err)
+	}
+	if err := svc.CreateRole("proj-B", "id-b", "admin", "Admin B", ""); err != nil {
+		t.Fatalf("CreateRole proj-B with same code in different project should succeed: %v", err)
+	}
+}
+
+func TestCreateRoleSameIDStillUpserts(t *testing.T) {
+	svc := newTestService(t)
+	if err := svc.CreateRole(testProject, "id-1", "admin", "Admin", "Initial"); err != nil {
+		t.Fatalf("CreateRole initial: %v", err)
+	}
+	if err := svc.CreateRole(testProject, "id-1", "admin_v2", "Admin Updated", "Updated"); err != nil {
+		t.Fatalf("CreateRole same ID upsert: %v", err)
+	}
+	r, err := svc.GetRole(testProject, "id-1")
+	if err != nil {
+		t.Fatalf("GetRole: %v", err)
+	}
+	if r.Code != "admin_v2" || r.Name != "Admin Updated" {
+		t.Fatalf("unexpected role after upsert: %+v", r)
+	}
+}
+
+func TestGetRoleByCodeErrorsOnAmbiguity(t *testing.T) {
+	db, svc := newTestServiceWithDB(t)
+
+	// Seed duplicate role rows directly into DB (bypassing CreateRole check)
+	if err := db.Create(&rbac.Role{ProjectId: testProject, Id: "id-1", Code: "editor", Name: "Ed1"}); err != nil {
+		t.Fatalf("db.Create 1: %v", err)
+	}
+	if err := db.Create(&rbac.Role{ProjectId: testProject, Id: "id-2", Code: "editor", Name: "Ed2"}); err != nil {
+		t.Fatalf("db.Create 2: %v", err)
+	}
+
+	_, err := svc.GetRoleByCode(testProject, "editor")
+	if err != rbac.ErrDuplicateRoleCode {
+		t.Fatalf("expected GetRoleByCode to return ErrDuplicateRoleCode on duplicate codes, got %v", err)
+	}
+}
+
+func TestMigrateDetectsPreexistingDuplicates(t *testing.T) {
+	db := orm.New(mem.New())
+	ddlCompiler := &mockCompiler{}
+
+	// Pre-create table and seed duplicate role rows directly
+	if err := db.RawConn().Exec("CREATE TABLE role (project_id TEXT, id TEXT, code TEXT, name TEXT, description TEXT, session_ttl INT, PRIMARY KEY(project_id, id))"); err != nil {
+		t.Fatalf("exec create table: %v", err)
+	}
+	if err := db.Create(&rbac.Role{ProjectId: "proj-dup", Id: "r1", Code: "dupcode", Name: "N1"}); err != nil {
+		t.Fatalf("db.Create r1: %v", err)
+	}
+	if err := db.Create(&rbac.Role{ProjectId: "proj-dup", Id: "r2", Code: "dupcode", Name: "N2"}); err != nil {
+		t.Fatalf("db.Create r2: %v", err)
+	}
+
+	dups, err := rbac.FindDuplicateRoleCodes(db)
+	if err != nil {
+		t.Fatalf("FindDuplicateRoleCodes: %v", err)
+	}
+	if len(dups) != 1 || dups[0].ProjectID != "proj-dup" || dups[0].Code != "dupcode" {
+		t.Fatalf("FindDuplicateRoleCodes expected [proj-dup, dupcode], got %+v", dups)
+	}
+
+	err = rbac.Migrate(db.RawConn(), ddlCompiler)
+	if err != rbac.ErrDuplicateRoleCode {
+		t.Fatalf("expected Migrate to return ErrDuplicateRoleCode on preexisting duplicates, got %v", err)
+	}
+}
+
+func TestRevokeRoleByCodeInvalidatesCache(t *testing.T) {
+	svc := newTestService(t)
+	if err := svc.CreateRole(testProject, "r_viewer", "viewer", "Viewer", ""); err != nil {
+		t.Fatalf("CreateRole: %v", err)
+	}
+	if err := svc.CreatePermission(testProject, "p_read", "Read docs", "docs", model.Read); err != nil {
+		t.Fatalf("CreatePermission: %v", err)
+	}
+	if err := svc.AssignPermission(testProject, "r_viewer", "p_read"); err != nil {
+		t.Fatalf("AssignPermission: %v", err)
+	}
+	if err := svc.AssignRoleByCode(testProject, "user-viewer", "viewer"); err != nil {
+		t.Fatalf("AssignRoleByCode: %v", err)
+	}
+
+	if !svc.Can(testProject, "user-viewer", "docs", model.Read) {
+		t.Fatal("expected viewer to read docs")
+	}
+
+	if err := svc.RevokeRoleByCode(testProject, "user-viewer", "viewer"); err != nil {
+		t.Fatalf("RevokeRoleByCode: %v", err)
+	}
+
+	if svc.Can(testProject, "user-viewer", "docs", model.Read) {
+		t.Fatal("expected permission to be revoked and cache invalidated")
+	}
+}
+
+func TestRevokeRoleByCodeIsIdempotent(t *testing.T) {
+	svc := newTestService(t)
+	if err := svc.CreateRole(testProject, "r_manager", "manager", "Manager", ""); err != nil {
+		t.Fatalf("CreateRole: %v", err)
+	}
+
+	if err := svc.RevokeRoleByCode(testProject, "user-unassigned", "manager"); err != nil {
+		t.Fatalf("RevokeRoleByCode on unassigned user should succeed (idempotent), got %v", err)
+	}
+}
+
+func TestRevokeRoleByCodeUnknownCode(t *testing.T) {
+	svc := newTestService(t)
+	err := svc.RevokeRoleByCode(testProject, "user-1", "nonexistent_code")
+	if err != rbac.ErrRoleNotFound {
+		t.Fatalf("expected ErrRoleNotFound, got %v", err)
+	}
+}
+
+func TestAssignRoleByCodeDoesNotCreateRole(t *testing.T) {
+	svc := newTestService(t)
+	err := svc.AssignRoleByCode(testProject, "user-1", "nonexistent_code")
+	if err != rbac.ErrRoleNotFound {
+		t.Fatalf("expected ErrRoleNotFound, got %v", err)
+	}
+
+	_, err = svc.GetRoleByCode(testProject, "nonexistent_code")
+	if err != rbac.ErrRoleNotFound {
+		t.Fatalf("expected role still not to exist, got %v", err)
+	}
+}
+
+func TestUsersInRole(t *testing.T) {
+	svc := newTestService(t)
+	if err := svc.CreateRole(testProject, "r_dev", "developer", "Dev", ""); err != nil {
+		t.Fatalf("CreateRole: %v", err)
+	}
+
+	users, err := svc.UsersInRole(testProject, "developer")
+	if err != nil {
+		t.Fatalf("UsersInRole empty: %v", err)
+	}
+	if users == nil || len(users) != 0 {
+		t.Fatalf("expected empty non-nil slice for role without users, got %+v", users)
+	}
+
+	if err := svc.AssignRoleByCode(testProject, "u1", "developer"); err != nil {
+		t.Fatalf("AssignRoleByCode u1: %v", err)
+	}
+	if err := svc.AssignRoleByCode(testProject, "u2", "developer"); err != nil {
+		t.Fatalf("AssignRoleByCode u2: %v", err)
+	}
+
+	users, err = svc.UsersInRole(testProject, "developer")
+	if err != nil {
+		t.Fatalf("UsersInRole: %v", err)
+	}
+	if len(users) != 2 || users[0] != "u1" || users[1] != "u2" {
+		t.Fatalf("unexpected UsersInRole result: %+v", users)
+	}
+}
+
+func TestRoleUserCount(t *testing.T) {
+	svc := newTestService(t)
+	if err := svc.CreateRole(testProject, "r_tester", "tester", "Tester", ""); err != nil {
+		t.Fatalf("CreateRole: %v", err)
+	}
+
+	cnt, err := svc.RoleUserCount(testProject, "tester")
+	if err != nil || cnt != 0 {
+		t.Fatalf("expected 0 users, got %d, err %v", cnt, err)
+	}
+
+	_ = svc.AssignRoleByCode(testProject, "u1", "tester")
+	_ = svc.AssignRoleByCode(testProject, "u2", "tester")
+
+	cnt, err = svc.RoleUserCount(testProject, "tester")
+	if err != nil || cnt != 2 {
+		t.Fatalf("expected 2 users, got %d, err %v", cnt, err)
+	}
+}
+
+func TestDeleteRoleUnknownReturnsNotFound(t *testing.T) {
+	svc := newTestService(t)
+	err := svc.DeleteRole(testProject, "unknown_role_id")
+	if err != rbac.ErrRoleNotFound {
+		t.Fatalf("expected ErrRoleNotFound, got %v", err)
+	}
+}
+
+func TestDeleteRoleByCodeRemovesAssignments(t *testing.T) {
+	svc := newTestService(t)
+	if err := svc.CreateRole(testProject, "r_ops", "ops", "Ops", ""); err != nil {
+		t.Fatalf("CreateRole: %v", err)
+	}
+	if err := svc.AssignRoleByCode(testProject, "u_ops", "ops"); err != nil {
+		t.Fatalf("AssignRoleByCode: %v", err)
+	}
+
+	if err := svc.DeleteRoleByCode(testProject, "ops"); err != nil {
+		t.Fatalf("DeleteRoleByCode: %v", err)
+	}
+
+	_, err := svc.UsersInRole(testProject, "ops")
+	if err != rbac.ErrRoleNotFound {
+		t.Fatalf("expected ErrRoleNotFound after role deleted by code, got %v", err)
+	}
+}

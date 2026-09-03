@@ -5,6 +5,11 @@ Role-based authorization runtime for TinyWasm applications. Authentication and
 sessions belong to `tinywasm/auth`. Both are siblings that depend only on
 `tinywasm/user` and never on each other.
 
+> **BREAKING CHANGE**: `DeleteRole` now returns `rbac.ErrRoleNotFound` when attempting to delete a non-existent role, instead of returning `nil`.
+>
+> **BREAKING CHANGE**: `GetRoleByCode` now returns `rbac.ErrRoleNotFound` (not `orm.ErrNotFound`) when the code doesn't exist in the project, and `rbac.ErrDuplicateRoleCode` if more than one row matches (should not happen after the unique index, but is now reported instead of silently picking one). Any caller comparing `err == orm.ErrNotFound` after `GetRoleByCode` must switch to `err == rbac.ErrRoleNotFound` — the code still compiles either way, so this fails silently at runtime (a 500 where a 404 used to be), not at compile time.
+
+
 ```mermaid
 flowchart TD
     U[user] --> R[rbac]
@@ -56,3 +61,14 @@ Empty or unknown subject IDs are denied — rbac never persists a "user" row,
 so a subject with no assignments simply resolves to zero permissions, not
 an error. Malformed stored actions deny and surface an error (never a
 silent `false, nil`).
+
+## API — Quiero X → Uso Y
+
+| Objetivo | Método |
+|---|---|
+| Asignar rol por código | `svc.AssignRoleByCode(projectID, userID, roleCode)` |
+| Revocar rol por código (invalida caché) | `svc.RevokeRoleByCode(projectID, userID, roleCode)` |
+| Listar usuarios de un rol | `svc.UsersInRole(projectID, roleCode)` |
+| Contar usuarios de un rol | `svc.RoleUserCount(projectID, roleCode)` |
+| Eliminar rol y asignaciones por código | `svc.DeleteRoleByCode(projectID, roleCode)` |
+| Detectar roles duplicados antes de migrar | `rbac.FindDuplicateRoleCodes(db)` |
