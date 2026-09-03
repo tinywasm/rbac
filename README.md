@@ -5,6 +5,9 @@ Role-based authorization runtime for TinyWasm applications. Authentication and
 sessions belong to `tinywasm/auth`. Both are siblings that depend only on
 `tinywasm/user` and never on each other.
 
+> **BREAKING CHANGE**: `DeleteRole` now returns `rbac.ErrRoleNotFound` when attempting to delete a non-existent role, instead of returning `nil`.
+
+
 ```mermaid
 flowchart TD
     U[user] --> R[rbac]
@@ -56,3 +59,14 @@ Empty or unknown subject IDs are denied — rbac never persists a "user" row,
 so a subject with no assignments simply resolves to zero permissions, not
 an error. Malformed stored actions deny and surface an error (never a
 silent `false, nil`).
+
+## API — Quiero X → Uso Y
+
+| Objetivo | Método |
+|---|---|
+| Asignar rol por código | `svc.AssignRoleByCode(projectID, userID, roleCode)` |
+| Revocar rol por código (invalida caché) | `svc.RevokeRoleByCode(projectID, userID, roleCode)` |
+| Listar usuarios de un rol | `svc.UsersInRole(projectID, roleCode)` |
+| Contar usuarios de un rol | `svc.RoleUserCount(projectID, roleCode)` |
+| Eliminar rol y asignaciones por código | `svc.DeleteRoleByCode(projectID, roleCode)` |
+| Detectar roles duplicados antes de migrar | `rbac.FindDuplicateRoleCodes(db)` |

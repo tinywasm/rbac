@@ -1,11 +1,41 @@
 package rbac
 
 import (
+	"github.com/tinywasm/fmt"
 	"github.com/tinywasm/model"
 	"github.com/tinywasm/orm"
 )
 
 func (m *Service) CreateRole(projectID, id string, code model.RoleCode, name, description string) error {
+	// Check if role already exists by (projectID, id) -> upsert path
+	existingByID, err := m.GetRole(projectID, id)
+	if err == nil {
+		// Existing role by ID found. Verify code is not taken by another role ID.
+		existingByCode, codeErr := m.GetRoleByCode(projectID, code)
+		if codeErr == nil && existingByCode.Id != id {
+			return ErrDuplicateRoleCode
+		}
+		if codeErr != nil && codeErr != ErrRoleNotFound && codeErr != orm.ErrNotFound {
+			return codeErr
+		}
+		existingByID.Code = string(code)
+		existingByID.Name = name
+		existingByID.Description = description
+		return m.db.Update(existingByID, orm.Eq(Role_.ProjectId, existingByID.ProjectId), orm.Eq(Role_.Id, existingByID.Id))
+	}
+	if err != ErrRoleNotFound && err != orm.ErrNotFound {
+		return err
+	}
+
+	// New role by ID. Check if code is already used by another role.
+	existingByCode, codeErr := m.GetRoleByCode(projectID, code)
+	if codeErr == nil && existingByCode.Id != id {
+		return ErrDuplicateRoleCode
+	}
+	if codeErr != nil && codeErr != ErrRoleNotFound && codeErr != orm.ErrNotFound {
+		return codeErr
+	}
+
 	r := &Role{
 		ProjectId:   projectID,
 		Id:          id,
@@ -13,20 +43,7 @@ func (m *Service) CreateRole(projectID, id string, code model.RoleCode, name, de
 		Name:        name,
 		Description: description,
 	}
-	err := m.db.Create(r)
-	if err != nil && isUniqueViolation(err) {
-		existingR := &Role{}
-		qb := m.db.Query(existingR).Where(Role_.ProjectId).Eq(projectID).Where(Role_.Id).Eq(id)
-		existingR, readErr := ReadOneRole(qb, existingR)
-		if readErr != nil {
-			return readErr
-		}
-		existingR.Code = string(code)
-		existingR.Name = name
-		existingR.Description = description
-		return m.db.Update(existingR, orm.Eq(Role_.ProjectId, existingR.ProjectId), orm.Eq(Role_.Id, existingR.Id))
-	}
-	return err
+	return m.db.Create(r)
 }
 
 // SetRoleSessionTTL sets the role's SessionTtl (seconds; 0 reverts to "use
@@ -56,7 +73,7 @@ func (m *Service) DeleteRole(projectID, id string) error {
 		return err
 	}
 	if len(roles) == 0 {
-		return nil // Or ErrNotFound
+		return ErrRoleNotFound
 	}
 	r := roles[0]
 
@@ -78,6 +95,16 @@ func (m *Service) DeleteRole(projectID, id string) error {
 		m.ucache.InvalidateByRole(id)
 	}
 	return err
+}
+
+// DeleteRoleByCode borra el rol y todas sus asignaciones. ErrRoleNotFound si
+// el code no existe en el proyecto.
+func (m *Service) DeleteRoleByCode(projectID string, code model.RoleCode) error {
+	role, err := m.GetRoleByCode(projectID, code)
+	if err != nil {
+		return err
+	}
+	return m.DeleteRole(projectID, role.Id)
 }
 
 func (m *Service) CreatePermission(projectID, id, name string, resource model.Resource, action model.Action) error {
@@ -142,9 +169,13 @@ func (m *Service) AssignRole(projectID, userID, roleID string) error {
 }
 
 func (m *Service) RevokeRole(projectID, userID, roleID string) error {
-	qb := m.db.Query(&UserRole{}).Where(UserRole_.ProjectId).Eq(projectID).Where(UserRole_.UserId).Eq(userID).Where(UserRole_.RoleId).Eq(roleID)
-	ur, err := ReadOneUserRole(qb, &UserRole{})
+	ur := &UserRole{}
+	qb := m.db.Query(ur).Where(UserRole_.ProjectId).Eq(projectID).Where(UserRole_.UserId).Eq(userID).Where(UserRole_.RoleId).Eq(roleID)
+	ur, err := ReadOneUserRole(qb, ur)
 	if err != nil {
+		if err == orm.ErrNotFound || fmt.Contains(err.Error(), "no rows") {
+			return nil
+		}
 		return err
 	}
 	err = m.db.Delete(ur, orm.Eq(UserRole_.ProjectId, ur.ProjectId), orm.Eq(UserRole_.UserId, ur.UserId), orm.Eq(UserRole_.RoleId, ur.RoleId))
@@ -152,6 +183,71 @@ func (m *Service) RevokeRole(projectID, userID, roleID string) error {
 		m.ucache.Delete(projectID, userID)
 	}
 	return err
+}
+
+// RevokeRoleByCode quita el rol identificado por su code al usuario dentro
+// del proyecto. Es el par de AssignRoleByCode y el camino que debe usar un
+// consumidor que habla en codes — nunca borrar la fila UserRole a mano: el
+// borrado directo NO invalida el caché de permisos y deja concediendo
+// accesos ya revocados.
+//
+// Idempotente: revocar un rol que el usuario no tiene no es un error.
+// ErrRoleNotFound si el code no existe en el proyecto.
+func (m *Service) RevokeRoleByCode(projectID, userID string, code model.RoleCode) error {
+	role, err := m.GetRoleByCode(projectID, code)
+	if err != nil {
+		return err
+	}
+	return m.RevokeRole(projectID, userID, role.Id)
+}
+
+// AssignRoleByCode concede el rol identificado por su code. Idempotente.
+// ErrRoleNotFound si el code no existe en el proyecto — a diferencia de
+// CreateRole, NO lo crea: conceder un rol y definirlo son decisiones
+// distintas y mezclarlas hace que un typo en el code cree un rol vacío.
+func (m *Service) AssignRoleByCode(projectID, userID string, code model.RoleCode) error {
+	role, err := m.GetRoleByCode(projectID, code)
+	if err != nil {
+		return err
+	}
+	return m.AssignRole(projectID, userID, role.Id)
+}
+
+// UsersInRole devuelve los ids de usuario que tienen el rol. Sólo ids: este
+// paquete no conoce la tabla de usuarios (ver ARCHITECTURE.md), así que
+// resolver perfiles es del consumidor.
+func (m *Service) UsersInRole(projectID string, code model.RoleCode) ([]string, error) {
+	role, err := m.GetRoleByCode(projectID, code)
+	if err != nil {
+		return nil, err
+	}
+
+	qb := m.db.Query(&UserRole{}).Where(UserRole_.ProjectId).Eq(projectID).Where(UserRole_.RoleId).Eq(role.Id)
+	urs, err := ReadAllUserRole(qb)
+	if err != nil {
+		return nil, err
+	}
+
+	userIDs := make([]string, 0, len(urs))
+	for _, ur := range urs {
+		userIDs = append(userIDs, ur.UserId)
+	}
+	return userIDs, nil
+}
+
+// RoleUserCount devuelve cuántos usuarios tienen el rol, sin traerlos.
+func (m *Service) RoleUserCount(projectID string, code model.RoleCode) (int64, error) {
+	role, err := m.GetRoleByCode(projectID, code)
+	if err != nil {
+		return 0, err
+	}
+
+	qb := m.db.Query(&UserRole{}).Where(UserRole_.ProjectId).Eq(projectID).Where(UserRole_.RoleId).Eq(role.Id)
+	urs, err := ReadAllUserRole(qb)
+	if err != nil {
+		return 0, err
+	}
+	return int64(len(urs)), nil
 }
 
 func (m *Service) GetUserRoles(projectID, userID string) ([]Role, error) {
@@ -211,7 +307,10 @@ func (m *Service) GetRoleByCode(projectID string, code model.RoleCode) (*Role, e
 		return nil, err
 	}
 	if len(roles) == 0 {
-		return nil, orm.ErrNotFound
+		return nil, ErrRoleNotFound
+	}
+	if len(roles) > 1 {
+		return nil, ErrDuplicateRoleCode
 	}
 	return roles[0], nil
 }
