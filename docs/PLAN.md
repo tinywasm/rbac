@@ -2,6 +2,8 @@
 PLAN: "fix(security): unique role code per project, revoke-by-code contract, cache invalidation"
 EXECUTOR: jules
 REVIEWER: none
+STATUS: running
+SESSION: 2716331072071053921
 ---
 
 > Este plan se despacha con el flujo CodeJob. Ver skill: `agents-workflow`.
