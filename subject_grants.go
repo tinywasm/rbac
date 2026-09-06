@@ -1,6 +1,6 @@
 package rbac
 
-import "github.com/tinywasm/orm"
+import "webtyp.com/orm"
 
 // subjectGrants is the roles+permissions resolved for one (projectID,
 // subjectID) pair. rbac never persists a "user" row — a subject is just an

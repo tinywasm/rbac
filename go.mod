@@ -1,13 +1,13 @@
-module github.com/tinywasm/rbac
+module webtyp.com/rbac
 
 go 1.25.2
 
 require (
-	github.com/tinywasm/ddl v0.0.12
-	github.com/tinywasm/fmt v0.25.7
-	github.com/tinywasm/model v0.1.7
-	github.com/tinywasm/orm v0.12.0
-	github.com/tinywasm/user v0.3.11
+	webtyp.com/ddl v0.0.12
+	webtyp.com/fmt v0.25.7
+	webtyp.com/model v0.1.7
+	webtyp.com/orm v0.12.0
+	webtyp.com/user v0.3.11
 )
 
-require github.com/tinywasm/storage v0.0.6
+require webtyp.com/storage v0.0.6

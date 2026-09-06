@@ -1,19 +1,19 @@
 # Architecture
 
-`tinywasm/rbac` owns role, permission, assignment, and authorization decision
+`webtyp/rbac` owns role, permission, assignment, and authorization decision
 mechanics. Assignments are keyed by `user.SubjectID`; this module does not know
 how subjects authenticate or how sessions are transported.
 
 Applications declare policy by creating roles and grants, then inject
-`rbac.Service.Can` into their router. `rbac` never imports `tinywasm/auth`;
-`auth` never imports `rbac`. Both depend only on `tinywasm/user`.
+`rbac.Service.Can` into their router. `rbac` never imports `webtyp/auth`;
+`auth` never imports `rbac`. Both depend only on `webtyp/user`.
 
 ## Dependency Direction
 
 ```mermaid
 flowchart TD
-    U[github.com/tinywasm/user<br/>SubjectID + Subject] --> R[github.com/tinywasm/rbac]
-    U --> A[github.com/tinywasm/auth<br/>never imports rbac]
+    U[webtyp.com/user<br/>SubjectID + Subject] --> R[webtyp.com/rbac]
+    U --> A[webtyp.com/auth<br/>never imports rbac]
     R --> C[application composition root]
     A --> C
     R -.->|never| A
@@ -78,7 +78,7 @@ beyond what `UserRole`/`RolePermission` need to resolve a decision. A
 `(projectID, subjectID)` pair that never received an `AssignRole` simply
 resolves to empty roles/permissions; there is nothing to look up and
 nothing that can 404. This was not always true: a pre-split vestige kept a
-full duplicate of `tinywasm/auth`'s user-management code here (`CreateUser`,
+full duplicate of `webtyp/auth`'s user-management code here (`CreateUser`,
 `GetUser`, `hydrateUser`, ...), removed once its only real caller
 (`HasPermission`) was rewritten to resolve grants directly from
 `UserRole`/`RolePermission` instead of reading a `User` row first.

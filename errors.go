@@ -1,6 +1,6 @@
 package rbac
 
-import "github.com/tinywasm/fmt"
+import "webtyp.com/fmt"
 
 // ErrNotFound reports that a role or permission id has no matching row.
 var ErrNotFound = fmt.Err("rbac", "not", "found")

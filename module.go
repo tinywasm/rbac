@@ -1,9 +1,9 @@
 package rbac
 
 import (
-	"github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
-	"github.com/tinywasm/user"
+	"webtyp.com/model"
+	"webtyp.com/orm"
+	"webtyp.com/user"
 )
 
 // Service owns role, permission, and subject-assignment persistence,

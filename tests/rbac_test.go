@@ -3,11 +3,11 @@ package tests
 import (
 	"testing"
 
-	"github.com/tinywasm/ddl"
-	"github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
-	"github.com/tinywasm/rbac"
-	"github.com/tinywasm/storage/mem"
+	"webtyp.com/ddl"
+	"webtyp.com/model"
+	"webtyp.com/orm"
+	"webtyp.com/rbac"
+	"webtyp.com/storage/mem"
 )
 
 func newTestService(t *testing.T) *rbac.Service {
@@ -200,7 +200,7 @@ func TestProjectsAreIsolated(t *testing.T) {
 	}
 }
 
-// TestHasPermission_CorruptActionFailsLoudly is ported from tinywasm/auth
+// TestHasPermission_CorruptActionFailsLoudly is ported from webtyp/auth
 // (pre-split vestige, see rbac ARCHITECTURE.md): a row whose stored action
 // is not a valid CRUD string must deny AND surface an error — never a
 // silent (false, nil) indistinguishable from "no permission". Such a row

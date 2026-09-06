@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/tinywasm/model"
+	"webtyp.com/model"
 )
 
 // TestAdminRevokesAccess_TakesEffectImmediately reproduces the exact flow

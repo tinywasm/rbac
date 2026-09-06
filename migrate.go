@@ -1,16 +1,16 @@
 package rbac
 
 import (
-	"github.com/tinywasm/ddl"
-	"github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
-	"github.com/tinywasm/storage"
+	"webtyp.com/ddl"
+	"webtyp.com/model"
+	"webtyp.com/orm"
+	"webtyp.com/storage"
 )
 
 // Índice único compuesto: dos roles con el mismo code dentro de un proyecto
 // hacen que GetRoleByCode devuelva uno arbitrario y que borrar el rol deje
 // vivo al otro con sus usuarios asignados — una revocación que no revoca.
-// Se emite acá y no en el modelo porque tinywasm/ddl todavía no expresa
+// Se emite acá y no en el modelo porque webtyp/ddl todavía no expresa
 // unicidad compuesta; si algún día lo hace, esto se muda al modelo.
 const roleCodeUniqueIndex = `CREATE UNIQUE INDEX IF NOT EXISTS ` +
 	`idx_role_project_code ON role (project_id, code)`

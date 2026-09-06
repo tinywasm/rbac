@@ -1,6 +1,6 @@
 package rbac
 
-import "github.com/tinywasm/model"
+import "webtyp.com/model"
 
 // Every table carries project_id as part of its primary key: two projects
 // (misitio, mjosefa-cms, ...) can each define a role with the same natural

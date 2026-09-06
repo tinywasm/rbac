@@ -1,9 +1,9 @@
 package rbac
 
 import (
-	"github.com/tinywasm/fmt"
-	"github.com/tinywasm/model"
-	"github.com/tinywasm/orm"
+	"webtyp.com/fmt"
+	"webtyp.com/model"
+	"webtyp.com/orm"
 )
 
 func (m *Service) CreateRole(projectID, id string, code model.RoleCode, name, description string) error {
@@ -77,7 +77,7 @@ func (m *Service) DeleteRole(projectID, id string) error {
 	}
 	r := roles[0]
 
-	// Delete from link tables first to simulate cascade, since tinywasm/orm doesn't cascade automatically like PRAGMA foreign_keys = ON does unless DB level handles it
+	// Delete from link tables first to simulate cascade, since webtyp/orm doesn't cascade automatically like PRAGMA foreign_keys = ON does unless DB level handles it
 	urQb := m.db.Query(&UserRole{}).Where(UserRole_.ProjectId).Eq(projectID).Where(UserRole_.RoleId).Eq(id)
 	urs, _ := ReadAllUserRole(urQb)
 	for _, ur := range urs {

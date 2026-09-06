@@ -1,9 +1,9 @@
-# tinywasm/rbac
+# webtyp/rbac
 <img src="docs/img/badges.svg">
 
-Role-based authorization runtime for TinyWasm applications. Authentication and
-sessions belong to `tinywasm/auth`. Both are siblings that depend only on
-`tinywasm/user` and never on each other.
+Role-based authorization runtime for WebTyp applications. Authentication and
+sessions belong to `webtyp/auth`. Both are siblings that depend only on
+`webtyp/user` and never on each other.
 
 > **BREAKING CHANGE**: `DeleteRole` now returns `rbac.ErrRoleNotFound` when attempting to delete a non-existent role, instead of returning `nil`.
 >
@@ -32,11 +32,11 @@ Schema reconciliation (`rbac.Migrate`) is performed once at deploy time, not ins
 
 ```go
 import (
-    "github.com/tinywasm/rbac"
-    "github.com/tinywasm/model"
-    "github.com/tinywasm/orm"
-    "github.com/tinywasm/sqlite"
-    "github.com/tinywasm/sqlt"
+    "webtyp.com/rbac"
+    "webtyp.com/model"
+    "webtyp.com/orm"
+    "webtyp.com/sqlite"
+    "webtyp.com/sqlt"
 )
 
 conn, _ := sqlite.Open("app.db")
