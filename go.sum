@@ -1,0 +1,12 @@
+webtyp.com/ddl v0.0.15 h1:8E1M8W09sG+kILT+cvMThAU+/ZO7rqTd7Fd1v3YYmB0=
+webtyp.com/ddl v0.0.15/go.mod h1:X5q0n8KY1iw+QkpyLPFZk11b665TUVdpQTd0IpQFbVk=
+webtyp.com/fmt v1.0.0 h1:W0vMMGC6ezg1q2LarAEaVnNvZ26hVqzZdQQH1wcNogM=
+webtyp.com/fmt v1.0.0/go.mod h1:FmTxx713R45J21kbH5JOmKGaaCap3fJPA9Yl2n4Ch7U=
+webtyp.com/model v0.1.8 h1:E8btSBmISbH1UHEUEmbrxCRWcX8zv08VvdRgWSAq894=
+webtyp.com/model v0.1.8/go.mod h1:OkyYeE3GOG8eAQGhd9wVsORAhr+xYj3q8avpoGXG25c=
+webtyp.com/orm v0.12.1 h1:p+MCEg6NOexDh9aNBaBmb94dUtJlxyQ4CssXcvDgkFk=
+webtyp.com/orm v0.12.1/go.mod h1:mqDLgyTZC8iPY6VXDivWiRKPt2Gg2rgCn9noyUUT5JQ=
+webtyp.com/storage v0.0.7 h1:L9zRLTdj/vzBvEefedRi8vFpllegY+GpdcbA/zKbTZE=
+webtyp.com/storage v0.0.7/go.mod h1:CjNQUZR19Rczs5G8BO886jYKWf5LBNyJKVK7oostqpQ=
+webtyp.com/user v0.3.12 h1:HPgWNCxWo+yQDRZJUDAFgfxfxGp823igbIr/2JkLxIk=
+webtyp.com/user v0.3.12/go.mod h1:fnh1qnJy8TGwb3ijhN8lu11xe84sBzqzrGbQXGvQwyo=
